@@ -1763,7 +1763,7 @@ function deleteCategory(id){
   run(){
    state.categories=state.categories.filter(c=>c.id!==id);
    if(ui.expandedCategory===id) ui.expandedCategory=(state.categories[0]||{}).id||null;
-   if(state.categoryTakeover.categoryId===id) state.categoryTakeover.categoryId=(state.categories[0]||{}).id||null;
+   
    logActivity('Deleted category','category',snapshot.name);
    save(); ui.sheet=null;
    toastUndo('Category deleted',()=>{ state.categories.splice(Math.min(idx,state.categories.length),0,snapshot); logActivity('Restored category','category',snapshot.name); save(); toast('Delete undone'); render(); });
