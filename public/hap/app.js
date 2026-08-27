@@ -1796,9 +1796,34 @@ function deleteItem(id){
   render();
  }});
 }
+/* Several promotions may run at once. Nothing is switched off automatically —
+   past three the admin gets a soft warning instead of a hard block. */
 function savePromotion(id){ const f=getItem(id);if(!f)return;
- for(const c of state.categories)for(const i of c.items)if(i.id!==id&&i.promotion?.active)i.promotion.active=false;
- f.item.promotion={active:true,...ui.sheetData.temp};state.appearance.promotionStyle=ui.sheetData.temp.style;state.preview.promoSeen=false;logActivity('Published promotion','item',f.item.name,'off','active');save();ui.sheet=null;toast('Promotion is live in Preview');render(); }
+ const temp=ui.sheetData.temp||{};
+ const wasRaw=String(temp.wasPrice??'').trim();
+ const was=wasRaw===''?null:Number(wasRaw);
+ if(was!==null&&(!isFinite(was)||was<=0)){ toast('Was-price must be a number above zero'); return; }
+ if(was!==null&&was<=Number(f.item.price)){ toast('Was-price should be higher than the current price'); return; }
+ f.item.promotion={active:true,intensity:temp.intensity||'normal',label:temp.label||"Tonight's Pick",style:PROMO_STYLES.some(s=>s[0]===temp.style)?temp.style:'framed',until:temp.until||'none',wasPrice:was,terms:String(temp.terms||'').trim(),startedAt:Date.now()};
+ state.preview.promoSeen=false;
+ logActivity('Published promotion','item',f.item.name,'off','active');
+ save();ui.sheet=null;ui.sheetData=null;
+ const count=itemPromotions().length;
+ toast(count>3?`${count} promotions active — the menu stops feeling special`:'Promotion is live in Preview');
+ render(); }
+/* Category promotions are first-class and stored per category. */
+function saveCategoryPromotion(id){ const c=state.categories.find(x=>x.id===id); if(!c) return;
+ const temp=ui.sheetData.temp||{};
+ c.promotion={active:true,label:String(temp.label||'Featured tonight').trim()||'Featured tonight',tint:CATEGORY_TINTS.some(t=>t[0]===temp.tint)?temp.tint:'brand',until:temp.until||'none',startedAt:Date.now()};
+ logActivity('Published promotion','category',c.name,'off','active');
+ save();ui.sheet=null;ui.sheetData=null;toast(`${c.name} is featured`);render(); }
+function endPromotion(kind,id){
+ if(kind==='category'){ const c=state.categories.find(x=>x.id===id); if(!c) return;
+  showConfirm({title:`Stop featuring ${c.name}?`,body:'The section stays on the menu, it just loses the featured treatment.',label:'End promotion',tone:'danger',run(){ const t=state.categories.find(x=>x.id===id); if(!t) return; t.promotion={active:false}; logActivity('Ended promotion','category',t.name,'active','off'); save(); ui.sheet=null; toast('Promotion ended'); render(); }});
+  return; }
+ const f=getItem(id); if(!f) return;
+ showConfirm({title:`Disable promotion on ${f.item.name}?`,body:'The dish stays on the menu, but it will no longer be featured to guests.',label:'End promotion',tone:'danger',run(){ const g=getItem(id); if(!g) return; g.item.promotion={active:false}; logActivity('Ended promotion','item',g.item.name,'active','off'); save(); ui.sheet=null; toast('Promotion ended'); render(); }});
+}
 
 // Offline QR encoder for the live deployed Preview URL.
 // Fixed QR Version 5-L (37x37), byte mode. This keeps the Netlify package dependency-free.
