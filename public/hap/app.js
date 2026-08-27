@@ -1329,6 +1329,11 @@ function renderSheet(){
 
  if(ui.sheet==='auth') return authSheet();
  if(ui.sheet==='promote') return promoteSheet();
+ if(ui.sheet==='promoteCategory') return promoteCategorySheet();
+ if(ui.sheet==='promoChooser') return promoChooserSheet();
+ if(ui.sheet==='bulkAvailability') return bulkAvailabilitySheet();
+ if(ui.sheet==='bulkPrice') return bulkPriceSheet();
+ if(ui.sheet==='itemActions') return itemActionsSheet();
  if(ui.sheet==='restaurantDetail') return restaurantDetailSheet();
  if(window.HapOps && HapOps.sheet) return HapOps.sheet(ui.sheet, opsCtx(), sheetShell);
  return '';
