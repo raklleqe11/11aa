@@ -1250,18 +1250,24 @@ function dietMatches(i){
 function visibleItemsOf(c){ return c.items.filter(i=>i.status!=='hidden'&&(!state.hideSoldOut||i.status!=='soldout')&&dietMatches(i)); }
 function visibleCategories(){ return state.categories.filter(c=>visibleItemsOf(c).length); }
 
+/* A promoted category is a different treatment entirely: tinted band, kicker
+   label above the heading, coloured heading. */
 function renderPublicCategory(c,ci){
  const visible=visibleItemsOf(c);
- return `<section class="menu-category ${state.categoryTakeover.active&&state.categoryTakeover.categoryId===c.id?'takeover':''}" id="cat-${c.id}" data-category="${c.id}"><div class="menu-category-head"><h2>${escapeHtml(tCategory(c))}</h2><span>${visible.length} ${visible.length===1?'item':'items'}</span></div><div class="product-list">${visible.map((i,ii)=>renderPublicItem(i,c,ci*4+ii)).join('')}</div></section>`;
+ const promo=isPromotedCategory(c)?c.promotion:null;
+ return `<section class="menu-category ${promo?`is-featured tint-${promo.tint||'brand'}`:''}" id="cat-${c.id}" data-category="${c.id}">${promo?`<div class="category-kicker">${escapeHtml(promo.label||'Featured tonight')}</div>`:''}<div class="menu-category-head"><h2>${escapeHtml(tCategory(c))}</h2><span>${visible.length} ${visible.length===1?'item':'items'}</span></div><div class="product-list">${visible.map((i,ii)=>renderPublicItem(i,c,ci*4+ii)).join('')}</div></section>`;
 }
+/* One line, never wrapping, never stealing space from the price. The readable
+   allergen wording stays; anything that does not fit is reachable through the
+   trailing See details chip, which opens the full dish sheet. */
 function itemBadges(i){
  const al=itemAllergens(i), di=itemDiets(i), sp=Number(i.spice)||0;
  if(!al.length&&!di.length&&!sp) return '';
- const bits=[];
- if(di.length) bits.push((DIETS.find(x=>x[0]===di[0])||[,di[0]])[1]);
- if(sp>0) bits.push(SPICE_LABELS[sp]||'Spicy');
- if(al.length) bits.push(al.length===1?`Contains ${allergenLabel(al[0]).toLowerCase()}`:`Contains ${allergenLabel(al[0]).toLowerCase()} +${al.length-1}`);
- return `<button class="detail-link" data-action="item-details" data-id="${i.id}" aria-label="See dish details for ${escapeHtml(tItem(i).name)}">${icon('info',12)}<span>${escapeHtml(bits.join(' · '))}</span></button>`;
+ const pills=[];
+ if(di.length) pills.push(`<span class="badge-pill diet">${escapeHtml((DIETS.find(x=>x[0]===di[0])||[,di[0]])[1])}</span>`);
+ if(sp>0) pills.push(`<span class="badge-pill spice">${escapeHtml(SPICE_LABELS[sp]||'Spicy')}</span>`);
+ if(al.length) pills.push(`<span class="badge-pill allergen">Contains ${escapeHtml(allergenLabel(al[0]).toLowerCase())}${al.length>1?` +${al.length-1}`:''}</span>`);
+ return `<button class="badge-row" data-action="item-details" data-id="${i.id}" aria-label="See dish details for ${escapeHtml(tItem(i).name)}">${pills.join('')}<span class="badge-pill more">See details</span></button>`;
 }
 /* Approximate second price (Euro) shown beside the menu price. */
 function approxPrice(base){
