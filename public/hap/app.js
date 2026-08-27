@@ -1295,9 +1295,28 @@ function currencyToggle(){
  if(!rates.length) return '';
  return `<button class="fx-chip" data-action="display-currency" aria-label="Change display currency">${escapeHtml(displayCurrencyCode())}${icon('down',10)}</button>`;
 }
+/* The price column owns its own vertical space: primary price first, the
+   approximate second currency beneath it. It never sits inline with badges. */
+function priceColumn(i,{showWas=true}={}){
+ const p=i.promotion||{};
+ const was=showWas&&isPromoLive(p)&&p.wasPrice?`<span class="product-price-was">${money(Number(p.wasPrice))}</span>`:'';
+ const approx=approxPrice(i.price);
+ return `<div class="product-price">${was}<span class="product-price-main">${menuPrice(i.price)}</span>${approx?`<span class="product-price-approx">${approx}</span>`:''}</div>`;
+}
 function renderPublicItem(i,c,idx){
- const p=i.promotion||{}; const promoted=p.active; const tr=tItem(i); const ing=tr.ingredients;
- return `<article class="menu-product reveal-item ${promoted?'is-promoted promo-'+(p.intensity||'subtle')+' promo-style-'+(p.style||state.appearance.promotionStyle):''} ${i.status==='hidden'?'hidden-item':''}" data-item-id="${i.id}" data-search="${escapeHtml((tr.name+' '+ing+' '+tCategory(c)).toLowerCase())}" style="transition-delay:${Math.min(idx%5*35,140)}ms">${promoted?`<span class="promo-border-label">${escapeHtml(p.label||'Recommended')}</span>`:''}<img class="product-img" src="${i.image}" alt="${escapeHtml(tr.name)}" loading="lazy"><div class="product-copy"><h3>${escapeHtml(tr.name)}</h3>${ing?`<p>${escapeHtml(ing)}</p>`:''}${itemBadges(i)}</div><div class="product-price">${menuPrice(i.price)}${approxPrice(i.price)?`<span class="product-price-approx">${approxPrice(i.price)}</span>`:''}</div>${i.status==='soldout'?`<div class="product-status">Sold out</div>`:''}</article>`;
+ const p=i.promotion||{}; const promoted=isPromoLive(p); const tr=tItem(i); const ing=tr.ingredients;
+ const style=promoted?(PROMO_STYLES.some(s=>s[0]===p.style)?p.style:(state.appearance.promotionStyle||'framed')):'';
+ const label=escapeHtml(p.label||'Recommended');
+ const chrome=!promoted?'':
+  style==='ribbon'?`<span class="promo-ribbon"><span>${label}</span></span>`:
+  style==='filled'?`<span class="promo-inline-label">${label}</span>`:
+  style==='editorial'?`<span class="promo-kicker-line">${label}</span>`:
+  style==='offer'?`<span class="promo-strip-label">${label}</span>`:
+  `<span class="promo-notch">${label}</span>`;
+ const footer=promoted&&style==='offer'
+  ? `<div class="promo-offer-strip"><span class="offer-terms">${p.terms?`Offer includes · ${escapeHtml(p.terms)}`:'Offer available now'}</span><span class="offer-price">${p.wasPrice?`<s>${money(Number(p.wasPrice))}</s>`:''}<strong>${menuPrice(i.price)}</strong></span></div>`
+  : '';
+ return `<article class="menu-product reveal-item ${promoted?`is-promoted promo-${p.intensity||'subtle'} promo-style-${style}`:''} ${i.status==='hidden'?'hidden-item':''}" data-item-id="${i.id}" data-search="${escapeHtml((tr.name+' '+ing+' '+tCategory(c)).toLowerCase())}" style="transition-delay:${Math.min(idx%5*35,140)}ms">${chrome}<img class="product-img" src="${i.image}" alt="${escapeHtml(tr.name)}" loading="lazy"><div class="product-copy"><h3>${escapeHtml(tr.name)}</h3>${ing?`<p>${escapeHtml(ing)}</p>`:''}${itemBadges(i)}</div>${priceColumn(i,{showWas:style!=='offer'})}${footer}${i.status==='soldout'?`<div class="product-status">Sold out</div>`:''}</article>`;
 }
 
 
