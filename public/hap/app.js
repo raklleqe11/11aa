@@ -1409,12 +1409,67 @@ function renameCategorySheet(){
  return sheetShell('Rename category','Guests see this name on the public menu.',`<form id="rename-category-form" class="form-grid"><input type="hidden" name="id" value="${c.id}"><div class="field"><label>Category name</label><input name="name" value="${escapeHtml(c.name)}" required></div><button class="btn primary full" type="button" data-action="save-rename-category">Save name</button></form>`);
 }
 
+/* The style gallery renders the real guest card for this dish, so the owner can
+   predict the result instead of decoding an abstract swatch. */
+function promoPreview(item,category,temp,style){
+ const clone={...item,promotion:{active:true,intensity:temp.intensity||'normal',label:temp.label||"Tonight's Pick",style,until:temp.until||'none',wasPrice:temp.wasPrice?Number(temp.wasPrice):null,terms:temp.terms||'',startedAt:Date.now()}};
+ const a=state.appearance;
+ return `<div class="promo-preview public-root ${state.theme==='dark'?'dark-menu':''} template-${a.template}" style="--menu-brand:${a.brand};--brand:${a.brand}"><div class="product-list">${renderPublicItem(clone,category,0)}</div></div>`;
+}
 function promoteSheet(){
- const found=getItem(ui.sheetData?.id); if(!found) return ''; const item=found.item; const p=item.promotion||{};
- const temp=ui.sheetData.temp||{type:p.type||'tonight',intensity:p.intensity||'normal',label:p.label||"Tonight's Pick",style:p.style||state.appearance.promotionStyle}; ui.sheetData.temp=temp;
- const types=[['today','Feature today'],['tonight','Feature tonight'],['new','New item'],['chef',"Chef's pick"],['limited','Limited'],['special','Special price'],['pair','Pair with…']];
- const labels=["Chef's Pick","Tonight's Pick",'Popular','New','House Favourite','Seasonal','Limited','Recommended'];
- return sheetShell(`Promote ${escapeHtml(item.name)}`,'Make it noticeable, not annoying.',`<div class="sheet-section"><div class="sheet-label">What do you want?</div><div class="choice-grid">${types.map(([id,n])=>`<button class="choice ${temp.type===id?'active':''}" data-action="promo-temp" data-key="type" data-value="${id}"><strong>${escapeHtml(n)}</strong><span>${id==='tonight'?'Ends automatically tonight':'Tasteful placement'}</span></button>`).join('')}</div></div><div class="sheet-section"><div class="sheet-label">How noticeable?</div><div class="segment-control">${['subtle','normal','strong'].map(id=>`<button class="${temp.intensity===id?'active':''}" data-action="promo-temp" data-key="intensity" data-value="${id}">${id[0].toUpperCase()+id.slice(1)}</button>`).join('')}</div></div><div class="sheet-section"><div class="sheet-label">Label</div><div class="preset-scroll">${labels.map(l=>`<button class="preset ${temp.label===l?'selected':''}" data-action="promo-temp" data-key="label" data-value="${escapeHtml(l)}"><strong>${escapeHtml(l)}</strong></button>`).join('')}</div></div><div class="sheet-section"><div class="sheet-label">Design</div><div class="gallery-grid">${promotionStyles.slice(0,8).map(([id,n])=>`<button class="promo-tile ${id} ${temp.style===id?'selected':''}" data-action="promo-temp" data-key="style" data-value="${id}"><div class="promo-mini-card"><span class="promo-mini-label">${escapeHtml(n)}</span></div><strong style="font-size:10px">${escapeHtml(n)}</strong></button>`).join('')}</div></div><button class="btn primary full" data-tour="sheet-primary" data-action="save-promotion" data-id="${item.id}">Save promotion</button>${p.active?`<button class="btn full" style="margin-top:8px" data-action="disable-promo" data-id="${item.id}">Disable promotion</button>`:''}`);
+ const found=getItem(ui.sheetData?.id); if(!found) return ''; const item=found.item, category=found.category; const p=item.promotion||{};
+ const temp=ui.sheetData.temp||{intensity:p.intensity||'normal',label:p.label||"Tonight's Pick",style:PROMO_STYLES.some(s=>s[0]===p.style)?p.style:'framed',until:p.until||'none',wasPrice:p.wasPrice??'',terms:p.terms||''}; ui.sheetData.temp=temp;
+ const active=itemPromotions().filter(x=>x.item.id!==item.id).length;
+ const untils=[['none','No end'],['tonight','Tonight'],['date','Pick a date']];
+ const isDate=temp.until&&!['none','tonight'].includes(temp.until);
+ return sheetShell(`Promote ${escapeHtml(item.name)}`,'Make it noticeable, not annoying.',`
+ ${active>=3?`<div class="promo-warn">${active+1} promotions active — the menu stops feeling special.</div>`:''}
+ <div class="sheet-section"><div class="sheet-label">Label</div><div class="preset-scroll">${PROMO_LABELS.map(l=>`<button class="preset ${temp.label===l?'selected':''}" data-action="promo-temp" data-key="label" data-value="${escapeHtml(l)}"><strong>${escapeHtml(l)}</strong></button>`).join('')}</div></div>
+ <div class="sheet-section"><div class="sheet-label">Card design</div><div class="promo-gallery">${PROMO_STYLES.map(([id,n,desc])=>`<button class="promo-style-card ${temp.style===id?'selected':''}" data-action="promo-temp" data-key="style" data-value="${id}"><div class="promo-style-head"><strong>${escapeHtml(n)}</strong><span>${escapeHtml(desc)}</span></div>${promoPreview(item,category,temp,id)}</button>`).join('')}</div></div>
+ <div class="sheet-section"><div class="sheet-label">Offer detail <small>optional</small></div><div class="form-grid">
+  <div class="field"><label>Was price (${escapeHtml(currencyOf().primary)})</label><input type="number" step="0.01" min="0" value="${escapeHtml(String(temp.wasPrice??''))}" data-action="promo-temp-input" data-key="wasPrice" placeholder="Higher than ${escapeHtml(String(item.price))}"></div>
+  <div class="field"><label>Terms</label><input value="${escapeHtml(temp.terms||'')}" data-action="promo-temp-input" data-key="terms" placeholder="Today only · 2 plates minimum"></div>
+ </div></div>
+ <div class="sheet-section"><div class="sheet-label">When does it end?</div><div class="segment-control">${untils.map(([id,n])=>`<button class="${(id==='date'?isDate:temp.until===id)?'active':''}" data-action="promo-temp" data-key="until" data-value="${id==='date'?(isDate?temp.until:new Date(Date.now()+6048e5).toISOString().slice(0,10)):id}">${n}</button>`).join('')}</div>${isDate?`<div class="field" style="margin-top:9px"><label>End date</label><input type="date" value="${escapeHtml(temp.until)}" data-action="promo-temp-input" data-key="until"></div>`:''}<p class="fx-note">${escapeHtml(promoEndsLabel({until:temp.until}))} · expired promotions come off the menu automatically.</p></div>
+ <div class="sheet-section"><div class="sheet-label">How noticeable?</div><div class="segment-control">${['subtle','normal','strong'].map(id=>`<button class="${temp.intensity===id?'active':''}" data-action="promo-temp" data-key="intensity" data-value="${id}">${id[0].toUpperCase()+id.slice(1)}</button>`).join('')}</div></div>
+ <button class="btn primary full" data-tour="sheet-primary" data-action="save-promotion" data-id="${item.id}">Save promotion</button>${p.active?`<button class="btn full" style="margin-top:8px" data-action="end-promotion" data-kind="item" data-id="${item.id}">End promotion</button>`:''}`);
+}
+function promoteCategorySheet(){
+ const c=state.categories.find(x=>x.id===ui.sheetData?.id); if(!c) return '';
+ const p=c.promotion||{};
+ const temp=ui.sheetData.temp||{label:p.label||'Featured tonight',tint:p.tint||'brand',until:p.until||'none'}; ui.sheetData.temp=temp;
+ const isDate=temp.until&&!['none','tonight'].includes(temp.until);
+ return sheetShell(`Promote ${escapeHtml(c.name)}`,'The whole section gets a tinted band and a kicker label.',`
+ <div class="sheet-section"><div class="sheet-label">Kicker label</div><div class="preset-scroll">${['Featured tonight','Chef recommends','Seasonal menu','Happy hour','Sweet finish'].map(l=>`<button class="preset ${temp.label===l?'selected':''}" data-action="promo-temp" data-key="label" data-value="${escapeHtml(l)}"><strong>${escapeHtml(l)}</strong></button>`).join('')}</div></div>
+ <div class="sheet-section"><div class="sheet-label">Tint</div><div class="segment-control">${CATEGORY_TINTS.map(([id,n])=>`<button class="${temp.tint===id?'active':''}" data-action="promo-temp" data-key="tint" data-value="${id}">${n}</button>`).join('')}</div></div>
+ <div class="sheet-section"><div class="sheet-label">Preview</div><div class="promo-preview public-root ${state.theme==='dark'?'dark-menu':''}" style="--menu-brand:${state.appearance.brand};--brand:${state.appearance.brand}"><section class="menu-category is-featured tint-${temp.tint||'brand'}"><div class="category-kicker">${escapeHtml(temp.label||'Featured tonight')}</div><div class="menu-category-head"><h2>${escapeHtml(c.name)}</h2><span>${c.items.length} items</span></div></section></div></div>
+ <div class="sheet-section"><div class="sheet-label">When does it end?</div><div class="segment-control">${[['none','No end'],['tonight','Tonight'],['date','Pick a date']].map(([id,n])=>`<button class="${(id==='date'?isDate:temp.until===id)?'active':''}" data-action="promo-temp" data-key="until" data-value="${id==='date'?(isDate?temp.until:new Date(Date.now()+6048e5).toISOString().slice(0,10)):id}">${n}</button>`).join('')}</div>${isDate?`<div class="field" style="margin-top:9px"><label>End date</label><input type="date" value="${escapeHtml(temp.until)}" data-action="promo-temp-input" data-key="until"></div>`:''}</div>
+ <button class="btn primary full" data-action="save-category-promotion" data-id="${c.id}">Save promotion</button>${p.active?`<button class="btn full" style="margin-top:8px" data-action="end-promotion" data-kind="category" data-id="${c.id}">End promotion</button>`:''}`);
+}
+function promoChooserSheet(){
+ return sheetShell('New promotion','Feature one dish, or a whole section.',`
+ <div class="sheet-section"><div class="sheet-label">Promote a dish</div><div class="settings-list">${allItems().map(i=>`<button class="card settings-row" data-action="promote-item" data-id="${i.id}"><div class="settings-icon">${icon('spark',17)}</div><div class="settings-copy"><strong>${escapeHtml(i.name)}</strong><span>${money(i.price)}${isPromoLive(i.promotion)?' · already promoted':''}</span></div>${icon('chevron',15)}</button>`).join('')}</div></div>
+ <div class="sheet-section"><div class="sheet-label">Promote a category</div><div class="settings-list">${state.categories.map(c=>`<button class="card settings-row" data-action="promote-category" data-id="${c.id}"><div class="settings-icon">${icon('menu',17)}</div><div class="settings-copy"><strong>${escapeHtml(c.name)}</strong><span>${c.items.length} items${isPromotedCategory(c)?' · already featured':''}</span></div>${icon('chevron',15)}</button>`).join('')}</div></div>`);
+}
+function bulkAvailabilitySheet(){
+ const items=allItems();
+ return sheetShell('Mark sold out','Tap the dishes that ran out, then save once.',`
+ <div class="bulk-list">${items.map(i=>{const st=(ui.sheetData.temp||{})[i.id]??i.status;return `<button class="bulk-row ${st==='soldout'?'is-soldout':''}" data-action="bulk-toggle" data-id="${i.id}"><img src="${i.image}" alt=""><div class="bulk-copy"><strong>${escapeHtml(i.name)}</strong><span>${st==='soldout'?'Sold out':st==='hidden'?'Hidden':'Available'}</span></div><i class="bulk-box">${st==='soldout'?icon('check',13):''}</i></button>`;}).join('')}</div>
+ <button class="btn primary full" style="margin-top:12px" data-action="save-bulk-availability">Save availability</button>`);
+}
+function bulkPriceSheet(){
+ const cur=currencyOf().primary;
+ return sheetShell('Update prices',`Every dish in ${escapeHtml(cur)}. Changes save as you go.`,`
+ <div class="bulk-list">${allItems().map(i=>`<div class="bulk-row static"><img src="${i.image}" alt=""><div class="bulk-copy"><strong>${escapeHtml(i.name)}</strong><span>${escapeHtml(cur)}</span></div><input class="bulk-price" type="number" step="0.01" min="0" value="${escapeHtml(String(i.price))}" data-action="bulk-price-input" data-id="${i.id}" aria-label="Price for ${escapeHtml(i.name)}"></div>`).join('')}</div>
+ <button class="btn primary full" style="margin-top:12px" data-action="close-sheet">Done</button>`);
+}
+function itemActionsSheet(){
+ const f=getItem(ui.sheetData?.id); if(!f) return '';
+ const i=f.item;
+ const rows=[['edit-item','Edit',icon('edit',17)],['cycle-status','Availability',icon('eyeOff',17)],['promote-item','Promote',icon('spark',17)],['move-item-up','Move up',icon('up',17)],['move-item-down','Move down',icon('down',17)]];
+ return sheetShell(escapeHtml(i.name),`${escapeHtml(f.category.name)} · ${money(i.price)}`,`
+ <div class="settings-list">${rows.map(([a,n,ic])=>`<button class="card settings-row" data-action="${a}" data-id="${i.id}" data-dir="${a==='move-item-up'?'up':'down'}"><div class="settings-icon">${ic}</div><div class="settings-copy"><strong>${n}</strong></div>${icon('chevron',15)}</button>`).join('')}
+ <button class="card settings-row" data-action="delete-item" data-id="${i.id}"><div class="settings-icon">${icon('trash',17)}</div><div class="settings-copy"><strong style="color:var(--danger)">Delete</strong></div></button></div>`);
 }
 function restaurantDetailSheet(){
  const r=state.superadmin.restaurants.find(x=>x.id===ui.sheetData?.id); if(!r) return '';
