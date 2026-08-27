@@ -1648,7 +1648,8 @@ app.addEventListener('click',e=>{
 
 app.addEventListener('change',e=>{
  const el=e.target;
- if(el.matches('[data-action="takeover-category"]')){ state.categoryTakeover.categoryId=el.value; save(); render(); return; }
+ if(el.matches('[data-action="bulk-price-input"]')){ const f=getItem(el.dataset.id); if(f){ const v=Number(el.value); if(isFinite(v)&&v>0){ const before=f.item.price; f.item.price=v; if(before!==v) logActivity('Changed price','item',f.item.name,String(before),String(v)); save(); } } return; }
+ if(el.matches('[data-action="promo-temp-input"]')){ ui.sheetData.temp={...(ui.sheetData.temp||{}),[el.dataset.key]:el.value}; return; }
  if(el.matches('[data-action="brand-custom"]')){ state.appearance.brand=el.value; save(); render(); return; }
  if(el.matches('[data-action="set-primary-currency"]')){ setPrimaryCurrency(el.value); return; }
  if(el.matches('[data-action="pick-translation-language"]')){ ui.transLang=el.value; render(); return; }
